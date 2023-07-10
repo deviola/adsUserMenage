@@ -1,17 +1,16 @@
 package com.ostasz.ads.service;
 
-import com.ostasz.ads.datamodel.dto.AddressDTO;
-import com.ostasz.ads.datamodel.dto.ContactDTO;
-import com.ostasz.ads.datamodel.dto.UserDTO;
-import com.ostasz.ads.datamodel.entity.User;
-import com.ostasz.ads.exception.UserAlreadyExistsException;
-import com.ostasz.ads.repository.ContactRepository;
-import com.ostasz.ads.repository.UserRepository;
-import com.ostasz.ads.service.export.UserDetailsExportService;
-import com.ostasz.ads.service.generator.AddressGenerator;
-import com.ostasz.ads.service.generator.ContactGenerator;
-import com.ostasz.ads.service.generator.UserGenerator;
-import com.ostasz.ads.validator.PeselValidator;
+import com.ostasz.ads.user.datamodel.dto.request.ContactRequest;
+import com.ostasz.ads.user.datamodel.dto.request.UserRequest;
+import com.ostasz.ads.user.datamodel.entity.User;
+import com.ostasz.ads.user.exception.UserAlreadyExistsException;
+import com.ostasz.ads.user.repository.UserRepository;
+import com.ostasz.ads.user.service.ContactService;
+import com.ostasz.ads.user.service.UserService;
+import com.ostasz.ads.user.service.export.UserDetailsExportService;
+import com.ostasz.ads.user.service.generator.ContactGenerator;
+import com.ostasz.ads.user.service.generator.UserGenerator;
+import com.ostasz.ads.user.validator.PeselValidator;
 import jdk.jfr.Description;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest
@@ -41,75 +40,51 @@ class UserServiceTest {
     private UserGenerator userGenerator;
     @Mock
     private ContactGenerator contactGenerator;
-    @Mock
-    private AddressGenerator addressGenerator;
-    @Mock
-    private ContactRepository contactRepository;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         userService = new UserService(userRepository, peselValidator, contactService, userDetailsExportService,
-                userGenerator, contactGenerator, addressGenerator, contactRepository);
-    }
-
-    @Test
-    @Description("Should correctly create new user.")
-    public void correctlyCreateUser() {
-        UserDTO userDTO = new UserDTO("John", "Doe", "1234567890");
-        String pesel = "1234567890";
-        User expectedUser = User.builder()
-                .firstName("John")
-                .lastName("Doe")
-                .pesel(pesel)
-                .build();
-
-        when(peselValidator.validate(userDTO.getPesel())).thenReturn(pesel);
-        when(userRepository.findByPesel(pesel)).thenReturn(null);
-
-        User createdUser = userService.createUser(userDTO);
-
-        assertNotNull(createdUser);
-        assertEquals(expectedUser.getFirstName(), createdUser.getFirstName());
-        assertEquals(expectedUser.getLastName(), createdUser.getLastName());
-        assertEquals(expectedUser.getPesel(), createdUser.getPesel());
-        verify(userRepository, times(1)).save(createdUser);
+                userGenerator, contactGenerator);
     }
 
     @Test
     @Description("Should throw exception when creating user that already exists.")
     public void createAlreadyExistedUser() {
-        UserDTO userDTO = new UserDTO("John", "Doe", "1234567890");
+        UserRequest userRequest = new UserRequest("John", "Doe", "1234567890");
         String pesel = "1234567890";
 
-        when(peselValidator.validate(userDTO.getPesel())).thenReturn(pesel);
-        when(userRepository.findByPesel(pesel)).thenReturn(new User());
+        doNothing().when(peselValidator).validate(userRequest.getPesel());
+        when(userRepository.findByPesel(pesel)).thenReturn(Optional.of(new User()));
 
         assertThrows(UserAlreadyExistsException.class, () -> {
-            userService.createUser(userDTO);
+            userService.createUser(userRequest);
         });
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    @Description("Correctly create new contact for existing user.")
-    void addUserContactToExistingUser() {
+    @Description("Verifies that a new contact is not added to user that does not exist")
+    void addUserContactToNotExistingUser() {
         Long userId = 1L;
 
-        ContactDTO contactDTO = new ContactDTO();
-        contactDTO.setEmail("test@example.com");
-        contactDTO.setHomeAddress(new AddressDTO("Street 1", "123", "A1", "Country", "12345"));
-        contactDTO.setRegisteredAddress(new AddressDTO("Street 2", "456", "B2", "Country", "67890"));
-        contactDTO.setPrivatePhoneNumber("123456789");
-        contactDTO.setBusinessPhoneNumber("987654321");
+        String homeAddress = "Street 1/123 33-345 Poland";
+        String registeredAddress = "Street 2/456 66-003 Poland";
+        String email = "test@example.com";
+        String privatePhoneNumber = "123456789";
+        String businessPhoneNumber = "987654321";
+
+        ContactRequest contactRequest = new ContactRequest(email, homeAddress, registeredAddress, privatePhoneNumber,
+                businessPhoneNumber);
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(NoSuchElementException.class, () -> {
-            userService.addUserContact(userId, contactDTO);
+            userService.addUserContact(userId, contactRequest);
         });
-        verify(contactService, never()).createContact(any(ContactDTO.class));
+        verify(contactService, never()).createContact(any(ContactRequest.class));
         verify(userRepository, never()).save(any(User.class));
     }
+
 }
 

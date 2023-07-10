@@ -16,7 +16,7 @@ This is a Java + Spring (Spring Boot) + H2 DB application that provides a REST A
 - Access Swagger documentation: http://localhost:8080/swagger-ui.html
 
 ## Unit Tests
-- Three unit tests have been implemented to ensure the correctness of the functionality.
+- Two unit tests have been implemented to ensure the correctness of the functionality.
 
 ## Export Users to File
 - A REST method is available to save all users to a file.
